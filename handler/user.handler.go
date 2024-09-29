@@ -1,18 +1,25 @@
 package handler
 
 import (
-	"log"
 	"restapi-gorm-gofiber/database"
 	"restapi-gorm-gofiber/model/entity"
 	"restapi-gorm-gofiber/model/request"
-	"restapi-gorm-gofiber/model/response"
+	// "restapi-gorm-gofiber/model/response"
+	"restapi-gorm-gofiber/utils"
+
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
+
+
+	"log"
 )
 
 
 func UserHandlerGetAll(ctx *fiber.Ctx) error {
+	userInfo := ctx.Locals("userInfo")
+	log.Println(userInfo)
+	
 	var users []entity.Users
 	result := database.DB.Find(&users)
 	if result.Error != nil {
@@ -45,12 +52,20 @@ func UserHandlerCreate(ctx *fiber.Ctx) error {
 	newUser := entity.Users{
 		Name: user.Name,
 		Email: user.Email,
-		Password: user.Password,
 		Phone: user.Phone,
 	}
 
-	errCreateUser := database.DB.Create(&newUser).Error
+	hashedPassword, err := utils.HashPassword(user.Password)
+	if err != nil {
+		log.Println(err)
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "internal server error",
+		})
+	}	
 
+	newUser.Password = hashedPassword
+
+	errCreateUser := database.DB.Create(&newUser).Error
 	if errCreateUser!= nil {
 		return ctx.Status(400).JSON(fiber.Map{
 			"message": "Could not create user", 
@@ -68,33 +83,27 @@ func UserHandlerCreate(ctx *fiber.Ctx) error {
 func UserHandlerGetById(ctx *fiber.Ctx) error {
 	userId := ctx.Params("id")
 
-	var user response.UserResponse
-	err := database.DB.First(&user, "10", userId).Error
+	var user entity.Users
+	err := database.DB.First(&user, "id = ?", userId).Error
 	if err != nil {
 		return ctx.Status(404).JSON(fiber.Map{
-			"message": "User not found",
-			"data": nil,
+			"message": "user not found",
 		})
 	}
 
-	userResponse := response.UserResponse{
-		Id: user.Id,
-		Name: user.Name,
-		Email: user.Email,
-		Password: user.Password,
-		Phone: user.Phone,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-	}
-	
-	// return ctx.JSON(fiber.Map{
-
-	// })
+	//userResponse := response.UserResponse{
+	//	ID:        user.ID,
+	//	Name:      user.Name,
+	//	Email:     user.Email,
+	//	Address:   user.Address,
+	//	Phone:     user.Phone,
+	//	CreatedAt: user.CreatedAt,
+	//	UpdatedAt: user.UpdatedAt,
+	//}
 
 	return ctx.JSON(fiber.Map{
-		"status": "success",
-		"message": "User successfully created",
-		"data": userResponse,
+		"message": "success",
+		"data":    user,
 	})
 }
 
